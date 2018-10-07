@@ -44,6 +44,23 @@ namespace FFVI_tileTool
             #region IMPORT
             {
                 string[] files = Directory.GetFiles(args[0], "map*.bin.png");
+                foreach(string file in files)
+                {
+                    Bitmap bmp = new Bitmap(Image.FromFile(file));
+                    switch(bmp.PixelFormat)
+                    {
+                        case PixelFormat.Format8bppIndexed:
+
+                            break;
+                        case PixelFormat.Format24bppRgb:
+                        case PixelFormat.Format32bppArgb:
+                            ConvertBPP(ref bmp, file);
+                            goto case PixelFormat.Format8bppIndexed;
+                        default:
+                            throw new Exception($"Unsupported PixelFormat in {file}. Expected: 8, 24 or 32BPP; Ind; RGB; ARGB. Got: {bmp.PixelFormat}");
+                    }
+                }
+//TODO
             }
             #endregion
             #region EXPORT
@@ -85,6 +102,32 @@ namespace FFVI_tileTool
                 }
             }
             #endregion
+        }
+
+        private static void ConvertBPP(ref Bitmap bmp, string file)
+        {
+            Console.WriteLine($"{file} is not 8BPP. Converting from {bmp.PixelFormat}");
+            Dictionary<Color, int> colorList = new Dictionary<Color, int>();
+            BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
+            byte[] bmpBuffer = new byte[bmpData.Width*bmpData.Height*(bmp.PixelFormat==PixelFormat.Format24bppRgb?3:4)];
+            Marshal.Copy(bmpData.Scan0, bmpBuffer, 0, bmpBuffer.Length);
+            bmp.UnlockBits(bmpData);
+            for(int i = 0; i<bmpBuffer.Length; i+= bmp.PixelFormat == PixelFormat.Format24bppRgb ? 3 : 4)
+            {
+                Color color = new Color()
+                {
+                    R = bmpBuffer[i],
+                    G = bmpBuffer[i + 1],
+                    B = bmpBuffer[i + 2],
+                    A = (byte)(bmp.PixelFormat == PixelFormat.Format24bppRgb ? 255 : bmpBuffer[i + 3])
+                };
+                if (colorList.ContainsKey(color))
+                    colorList[color]++;
+                else colorList.Add(color, 1);
+            }
+            if (colorList.Count > 255)
+                Console.WriteLine($"File {file} contains more than 255 colors. Got: {colorList.Count}");
+            //TODO CONERSION
         }
     }
 }
