@@ -30,7 +30,7 @@ namespace FFVI_tileTool
         {
 #if DEBUG
             //args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map" };
-            args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map\convertedTiles" };
+            //args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map\convertedTiles" };
 #endif
 
             if (args.Length == 0)
@@ -80,7 +80,7 @@ namespace FFVI_tileTool
                     fs.Close();
                     fs.Dispose();
 
-                    Bitmap bmp = new Bitmap(512, imageBuffer.Length / 512 + 1, PixelFormat.Format32bppArgb);
+                    Bitmap bmp = new Bitmap(512, (imageBuffer.Length % 512 > 0 ? imageBuffer.Length/512+1 : imageBuffer.Length/512), PixelFormat.Format32bppArgb);
                     MapTile mapTile = new MapTile() { palette = new Color[256], imgBuff = imageBuffer };
                     for (int i = 0; i < mapTile.palette.Length; i++)
                         mapTile.palette[i] = new Color() { R = paletteBuffer[i * 4], G = paletteBuffer[i * 4 + 1], B = paletteBuffer[i * 4 + 2], A = paletteBuffer[i * 4 + 3] };
