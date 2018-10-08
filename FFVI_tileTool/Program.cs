@@ -46,12 +46,20 @@ namespace FFVI_tileTool
                 string[] files = Directory.GetFiles(args[0], "map*.bin.png");
                 foreach(string file in files)
                 {
-                    Bitmap bmp = new Bitmap(Image.FromFile(file));
+                    Bitmap bmp = new Bitmap(file);
                     switch(bmp.PixelFormat)
                     {
                         case PixelFormat.Format8bppIndexed:
-
-                            break;
+                            if (bmp.PixelFormat != PixelFormat.Format8bppIndexed)
+                                throw new Exception("Conversion failed. Contact Maki...");
+                            byte[] palBuffer = BuildPalette(bmp);
+                            BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, PixelFormat.Format8bppIndexed);
+                            byte[] imageBuffer = new byte[bmpData.Width * bmpData.Height];
+                            Marshal.Copy(bmpData.Scan0, imageBuffer, 0, imageBuffer.Length);
+                            bmp.UnlockBits(bmpData);
+                            using (FileStream fs = new FileStream(file.Substring(0, file.Length - 4), FileMode.OpenOrCreate, FileAccess.Write))
+                                using (BinaryWriter bw = new BinaryWriter(fs)) { bw.Write(palBuffer); bw.Write(imageBuffer); }
+                                break;
                         case PixelFormat.Format24bppRgb:
                         case PixelFormat.Format32bppArgb:
                             ConvertBPP(ref bmp, file);
@@ -80,28 +88,52 @@ namespace FFVI_tileTool
                     fs.Close();
                     fs.Dispose();
 
-                    Bitmap bmp = new Bitmap(512, (imageBuffer.Length % 512 > 0 ? imageBuffer.Length/512+1 : imageBuffer.Length/512), PixelFormat.Format32bppArgb);
+                    Bitmap bmp = new Bitmap(512, (imageBuffer.Length % 512 > 0 ? imageBuffer.Length/512+1 : imageBuffer.Length/512), PixelFormat.Format8bppIndexed);
                     MapTile mapTile = new MapTile() { palette = new Color[256], imgBuff = imageBuffer };
                     for (int i = 0; i < mapTile.palette.Length; i++)
                         mapTile.palette[i] = new Color() { R = paletteBuffer[i * 4], G = paletteBuffer[i * 4 + 1], B = paletteBuffer[i * 4 + 2], A = paletteBuffer[i * 4 + 3] };
-                    BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-                    byte[] bmpDataBuffer = new byte[bmpData.Width * bmpData.Height * 4];
-                    Marshal.Copy(bmpData.Scan0, bmpDataBuffer, 0, bmpDataBuffer.Length);
-                    for (int i = 0; i < mapTile.imgBuff.Length; i++)
-                    {
-                        bmpDataBuffer[i * 4] = mapTile.palette[mapTile.imgBuff[i]].R;
-                        bmpDataBuffer[i * 4 + 1] = mapTile.palette[mapTile.imgBuff[i]].G;
-                        bmpDataBuffer[i * 4 + 2] = mapTile.palette[mapTile.imgBuff[i]].B;
-                        bmpDataBuffer[i * 4 + 3] = (byte)((bmpDataBuffer[i * 4] == 0 && bmpDataBuffer[i * 4 + 1] == 0 && bmpDataBuffer[i * 4 + 2] == 0) ?
-                            0 :
-                            (byte)(255 - mapTile.palette[mapTile.imgBuff[i]].A));
-                    }
-                    Marshal.Copy(bmpDataBuffer, 0, bmpData.Scan0, bmpDataBuffer.Length);
+                    ColorPalette cp = bmp.Palette;
+                    for (int i = 0; i < 256; i++)
+                        cp.Entries[i] = System.Drawing.Color.FromArgb(
+                            255-mapTile.palette[i].A,
+                            mapTile.palette[i].B,
+                            mapTile.palette[i].G,
+                            mapTile.palette[i].R);
+                    bmp.Palette = cp;
+                    BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.WriteOnly, PixelFormat.Format8bppIndexed);
+                    byte[] bmpDataBuffer = new byte[bmpData.Width * bmpData.Height];
+
+                    Marshal.Copy(mapTile.imgBuff, 0, bmpData.Scan0, mapTile.imgBuff.Length);
+                    //Marshal.Copy(bmpData.Scan0, bmpDataBuffer, 0, bmpDataBuffer.Length);
+                    //for (int i = 0; i < mapTile.imgBuff.Length; i++)
+                    //{
+                    //   /* bmpDataBuffer[i * 4] = mapTile.palette[mapTile.imgBuff[i]].R;
+                    //    bmpDataBuffer[i * 4 + 1] = mapTile.palette[mapTile.imgBuff[i]].G;
+                    //    bmpDataBuffer[i * 4 + 2] = mapTile.palette[mapTile.imgBuff[i]].B;
+                    //    bmpDataBuffer[i * 4 + 3] = (byte)((bmpDataBuffer[i * 4] == 0 && bmpDataBuffer[i * 4 + 1] == 0 && bmpDataBuffer[i * 4 + 2] == 0) ?
+                    //        0 :
+                    //        (byte)(255 - mapTile.palette[mapTile.imgBuff[i]].A));*/
+                       
+                    //}
+                    //Marshal.Copy(bmpDataBuffer, 0, bmpData.Scan0, bmpDataBuffer.Length);
                     bmp.UnlockBits(bmpData);
                     bmp.Save($"{Path.GetDirectoryName(file)}\\convertedTiles\\{Path.GetFileName(file)}.png", ImageFormat.Png);
                 }
             }
             #endregion
+        }
+
+        private static byte[] BuildPalette(Bitmap bmp)
+        {
+            byte[] palBuffer = new byte[1024];
+            for(int i = 0; i<256; i++)
+            {
+                palBuffer[i * 4 + 0] = bmp.Palette.Entries[i].B;
+                palBuffer[i * 4 + 1] = bmp.Palette.Entries[i].G;
+                palBuffer[i * 4 + 2] = bmp.Palette.Entries[i].R;
+                palBuffer[i * 4 + 3] = (byte)(255-bmp.Palette.Entries[i].A);
+            }
+            return palBuffer;
         }
 
         private static void ConvertBPP(ref Bitmap bmp, string file)
@@ -112,7 +144,8 @@ namespace FFVI_tileTool
             byte[] bmpBuffer = new byte[bmpData.Width*bmpData.Height*(bmp.PixelFormat==PixelFormat.Format24bppRgb?3:4)];
             Marshal.Copy(bmpData.Scan0, bmpBuffer, 0, bmpBuffer.Length);
             bmp.UnlockBits(bmpData);
-            for(int i = 0; i<bmpBuffer.Length; i+= bmp.PixelFormat == PixelFormat.Format24bppRgb ? 3 : 4)
+            int multiplier = bmp.PixelFormat == PixelFormat.Format24bppRgb ? 3 : 4;
+            for (int i = 0; i<bmpBuffer.Length; i+= multiplier)
             {
                 Color color = new Color()
                 {
@@ -127,7 +160,41 @@ namespace FFVI_tileTool
             }
             if (colorList.Count > 255)
                 Console.WriteLine($"File {file} contains more than 255 colors. Got: {colorList.Count}");
-            //TODO CONERSION
+            var cl = colorList.Keys.ToList();
+            var clv = colorList.Values.ToList();
+            List<Tuple<Color, int>> cpl = new List<Tuple<Color, int>>();
+            for (int i = 0; i < cl.Count; i++)
+                cpl.Add(new Tuple<Color, int>(cl[i], clv[i]));
+            cpl = cpl.OrderByDescending(x => x.Item2).ToList();
+
+            Bitmap bb = new Bitmap(bmp.Width, bmp.Height, PixelFormat.Format8bppIndexed);
+            ColorPalette cp = bb.Palette;
+            for (int i = 0; i < 256; i++)
+                if (i >= cpl.Count)
+                    cp.Entries[i] = System.Drawing.Color.Black;
+                else
+                    cp.Entries[i] = System.Drawing.Color.FromArgb(cpl[i].Item1.A, cpl[i].Item1.R, cpl[i].Item1.G, cpl[i].Item1.B);
+            bb.Palette = cp;
+            BitmapData bbData = bb.LockBits(new Rectangle(0, 0, bb.Width, bb.Height), ImageLockMode.ReadWrite, PixelFormat.Format8bppIndexed);
+            byte[] bbBuffer = new byte[bbData.Height * bbData.Width];
+            
+            Marshal.Copy(bbData.Scan0, bbBuffer, 0, bbBuffer.Length);
+            
+            for (int i = 0; i<bbBuffer.Length; i++)
+            {
+                byte R = bmpBuffer[i * multiplier];
+                byte G = bmpBuffer[i * multiplier + 1];
+                byte B = bmpBuffer[i * multiplier + 2];
+                byte A = (byte)(multiplier == 3 ? 255 : bmpBuffer[i * multiplier + 3]);
+                System.Drawing.Color clr = System.Drawing.Color.FromArgb(A, R, G, B);
+                int colorIndex = -1;
+                for (int n = 0; n < 256; n++)
+                    if (bb.Palette.Entries[n] == clr) { colorIndex = n; break; }
+                bbBuffer[i] = (byte)(colorIndex != -1 ? colorIndex : 255);
+            }
+            Marshal.Copy(bbBuffer, 0, bbData.Scan0, bbBuffer.Length);
+            bb.UnlockBits(bbData);
+            bmp = bb;
         }
     }
 }
