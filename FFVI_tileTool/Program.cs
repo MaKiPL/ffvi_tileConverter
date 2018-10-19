@@ -29,7 +29,7 @@ namespace FFVI_tileTool
         static void Main(string[] args)
         {
 #if DEBUG
-            //args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map" };
+            args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map" };
             //args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map\convertedTiles" };
 #endif
 
@@ -80,27 +80,36 @@ namespace FFVI_tileTool
                 foreach (string file in files)
                 {
                     byte[] paletteBuffer = new byte[1024];
+                    byte[] secPaletteBuffer = new byte[4096];
                     FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read);
                     BinaryReader br = new BinaryReader(fs);
                     paletteBuffer = br.ReadBytes(1024);
-                    byte[] imageBuffer = br.ReadBytes((int)(fs.Length - fs.Position));
+                    byte[] firstImageBuffer = br.ReadBytes(512*512);
+                    //byte[] firstImageBuffer = br.ReadBytes((int)(fs.Length - fs.Position));
+                    //fs.Seek(263168, SeekOrigin.Begin);
+                    secPaletteBuffer = br.ReadBytes(4096);
+                    byte[] secondImageBuffer = br.ReadBytes((int)(fs.Length - fs.Position));
                     br.Close();
                     fs.Close();
                     fs.Dispose();
 
-                    Bitmap bmp = new Bitmap(512, (imageBuffer.Length % 512 > 0 ? imageBuffer.Length/512+1 : imageBuffer.Length/512), PixelFormat.Format8bppIndexed);
-                    MapTile mapTile = new MapTile() { palette = new Color[256], imgBuff = imageBuffer };
+
+                    Bitmap bmpOne = new Bitmap(512, 512, PixelFormat.Format8bppIndexed);
+                    //bmpSecond ; varied size
+                    //second bmp is 512* (imagebuffer/512). It's always INT
+                    throw new Exception("NOT IMPLEMENTED, Go away");
+                    MapTile mapTile = new MapTile() { palette = new Color[256], imgBuff = firstImageBuffer };
                     for (int i = 0; i < mapTile.palette.Length; i++)
                         mapTile.palette[i] = new Color() { R = paletteBuffer[i * 4], G = paletteBuffer[i * 4 + 1], B = paletteBuffer[i * 4 + 2], A = paletteBuffer[i * 4 + 3] };
-                    ColorPalette cp = bmp.Palette;
+                    ColorPalette cp = bmpOne.Palette;
                     for (int i = 0; i < 256; i++)
                         cp.Entries[i] = System.Drawing.Color.FromArgb(
                             255-mapTile.palette[i].A,
                             mapTile.palette[i].B,
                             mapTile.palette[i].G,
                             mapTile.palette[i].R);
-                    bmp.Palette = cp;
-                    BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.WriteOnly, PixelFormat.Format8bppIndexed);
+                    bmpOne.Palette = cp;
+                    BitmapData bmpData = bmpOne.LockBits(new Rectangle(0, 0, bmpOne.Width, bmpOne.Height), ImageLockMode.WriteOnly, PixelFormat.Format8bppIndexed);
                     byte[] bmpDataBuffer = new byte[bmpData.Width * bmpData.Height];
 
                     Marshal.Copy(mapTile.imgBuff, 0, bmpData.Scan0, mapTile.imgBuff.Length);
@@ -116,8 +125,8 @@ namespace FFVI_tileTool
                        
                     //}
                     //Marshal.Copy(bmpDataBuffer, 0, bmpData.Scan0, bmpDataBuffer.Length);
-                    bmp.UnlockBits(bmpData);
-                    bmp.Save($"{Path.GetDirectoryName(file)}\\convertedTiles\\{Path.GetFileName(file)}.png", ImageFormat.Png);
+                    bmpOne.UnlockBits(bmpData);
+                    bmpOne.Save($"{Path.GetDirectoryName(file)}\\convertedTiles\\{Path.GetFileName(file)}.png", ImageFormat.Png);
                 }
             }
             #endregion
