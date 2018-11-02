@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace FFVI_tileTool
 {
@@ -26,19 +27,21 @@ namespace FFVI_tileTool
             public byte[] imgBuff;
         }
 
+        [STAThread]
         static void Main(string[] args)
         {
 #if DEBUG
-            args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map" };
+            //args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map" };
             //args = new string[] { @"D:\SteamLibrary\steamapps\common\Final Fantasy 6\obb\field\map\convertedTiles" };
 #endif
 
             if (args.Length == 0)
             {
-                Console.WriteLine("Just run this with a path to your *.bin folder or convertedTiles folder");
-                Console.ReadLine();
-                return;
-            }
+            Application.EnableVisualStyles();
+            Application.Run(new Form1());
+                }
+
+            //fallback to old algorithm
 
             if (args[0].Contains("map\\convertedTiles"))
             #region IMPORT
