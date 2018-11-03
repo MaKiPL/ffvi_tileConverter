@@ -39,6 +39,7 @@ namespace FFVI_tileTool
             {
             Application.EnableVisualStyles();
             Application.Run(new Form1());
+                return;
                 }
 
             //fallback to old algorithm
