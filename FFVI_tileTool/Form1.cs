@@ -227,12 +227,24 @@ namespace FFVI_tileTool
         private static byte[] BuildPalette(Bitmap bmp)
         {
             byte[] palBuffer = new byte[1024];
-            for (int i = 0; i < 256; i++)
+            if (bmp.Palette.Entries.Length == 256)
+                for (int i = 0; i < 256; i++)
+                {
+                    palBuffer[i * 4 + 0] = bmp.Palette.Entries[i].B;
+                    palBuffer[i * 4 + 1] = bmp.Palette.Entries[i].G;
+                    palBuffer[i * 4 + 2] = bmp.Palette.Entries[i].R;
+                    palBuffer[i * 4 + 3] = (byte)(255 - bmp.Palette.Entries[i].A);
+                }
+            else
             {
-                palBuffer[i * 4 + 0] = bmp.Palette.Entries[i].B;
-                palBuffer[i * 4 + 1] = bmp.Palette.Entries[i].G;
-                palBuffer[i * 4 + 2] = bmp.Palette.Entries[i].R;
-                palBuffer[i * 4 + 3] = (byte)(255 - bmp.Palette.Entries[i].A);
+                for (int i = 0; i < 255; i++)
+                {
+                    palBuffer[i * 4 + 0] = bmp.Palette.Entries[i].B;
+                    palBuffer[i * 4 + 1] = bmp.Palette.Entries[i].G;
+                    palBuffer[i * 4 + 2] = bmp.Palette.Entries[i].R;
+                    palBuffer[i * 4 + 3] = (byte)(255 - bmp.Palette.Entries[i].A);
+                }
+                palBuffer[1023] = 255;
             }
             return palBuffer;
         }
