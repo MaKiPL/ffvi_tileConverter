@@ -67,9 +67,14 @@ namespace FFVI_tileTool
             BinaryReader br = new BinaryReader(fs);
             paletteBuffer = br.ReadBytes(1024);
             byte[] firstImageBuffer = br.ReadBytes(512 * 512);
-            secPaletteBuffer = br.ReadBytes(4096);
-            fs.Seek(512 * 24, SeekOrigin.Current);
-            byte[] secondImageBuffer = br.ReadBytes((int)(fs.Length - fs.Position));
+            //secPaletteBuffer = br.ReadBytes(4096);
+            byte[] secondImageBuffer = new byte[0];
+            if (fs.Length > 0x80400 + 1024)
+            {
+                fs.Seek(-0x80400, SeekOrigin.End); //Ark's hack
+                secPaletteBuffer = br.ReadBytes(1024);
+                secondImageBuffer = br.ReadBytes((int)(fs.Length - fs.Position));
+            }
             br.Close();
             fs.Close();
             fs.Dispose();
@@ -193,22 +198,20 @@ namespace FFVI_tileTool
             }
             byte[] palBuffer = BuildPalette(bmp);
             BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, 512, bmp.Height), ImageLockMode.ReadOnly, PixelFormat.Format8bppIndexed);
-            byte[] b = new byte[512 * bmp.Height + 4096];
+            byte[] b = new byte[512 * bmp.Height + 1024];
             Buffer.BlockCopy(palBuffer, 0, b, 0, 1024);
-            Buffer.BlockCopy(palBuffer, 0, b, 1024, 1024);
-            Buffer.BlockCopy(palBuffer, 0, b, 2048, 1024);
-            Buffer.BlockCopy(palBuffer, 0, b, 3072, 1024);
-            Marshal.Copy(bmpData.Scan0, b, 4096, 512 * bmp.Height);
+            Marshal.Copy(bmpData.Scan0, b, 1024, 512 * bmp.Height);
             bmp.UnlockBits(bmpData);
 
             string filePath = st.Where(x => Path.GetFileName(x) == (string)listBox1.SelectedValue).First();
             byte[] bb = File.ReadAllBytes(filePath);
-            if(bb.Length < 512*512+1024+b.Length + 512*24)
-            {
-                MessageBox.Show("Second chunk is too big!");
-                return;
-            }
-            Buffer.BlockCopy(b, 0, bb, 512*512+1024 + 512*24, b.Length);
+            //if(bb.Length < 512*512+1024+b.Length + 512*24)
+            //{
+            //    MessageBox.Show("Second chunk is too big!");
+            //    return;
+            //}
+
+            Buffer.BlockCopy(b, 0, bb, bb.Length-0x80400, b.Length);
             File.WriteAllBytes(filePath, bb);
             RenderImage(filePath);
         }
@@ -232,6 +235,12 @@ namespace FFVI_tileTool
                 palBuffer[i * 4 + 3] = (byte)(255 - bmp.Palette.Entries[i].A);
             }
             return palBuffer;
+        }
+
+        private void browseAndMassExportToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("In next release! Sorry, forgot about it yet I want to release working version right now");
+            return;
         }
     }
 }
