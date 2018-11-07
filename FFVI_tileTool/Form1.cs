@@ -169,10 +169,6 @@ namespace FFVI_tileTool
             Buffer.BlockCopy(b, 0, bb, 0, b.Length);
             File.WriteAllBytes(filePath, bb);
             RenderImage(filePath);
-
-            //is first import button; img needs to be 512x512
-            //WIP - import the image via bitlock, copy buffer, check if 512x512 and parse palette- therefore check if 8bpp
-            //then just put to st[] array (filelist) and copy to buffer on overwrite
         }
 
         private void button3_Click(object sender, EventArgs e)
@@ -207,12 +203,12 @@ namespace FFVI_tileTool
 
             string filePath = st.Where(x => Path.GetFileName(x) == (string)listBox1.SelectedValue).First();
             byte[] bb = File.ReadAllBytes(filePath);
-            if(bb.Length < 512*512+1024+b.Length)
+            if(bb.Length < 512*512+1024+b.Length + 512*24)
             {
                 MessageBox.Show("Second chunk is too big!");
                 return;
             }
-            Buffer.BlockCopy(b, 0, bb, 512*512+1024, b.Length);
+            Buffer.BlockCopy(b, 0, bb, 512*512+1024 + 512*24, b.Length);
             File.WriteAllBytes(filePath, bb);
             RenderImage(filePath);
         }
