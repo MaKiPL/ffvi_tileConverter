@@ -101,7 +101,7 @@ namespace FFVI_tileTool
                 Bitmap bmpTwo = new Bitmap(512, secondImageBuffer.Length / 512, PixelFormat.Format8bppIndexed);
                 mapTile = new MapTile() { palette = new Color[256], imgBuff = secondImageBuffer };
                 for (int i = 0; i < mapTile.palette.Length; i++)
-                    mapTile.palette[i] = new Color() { R = paletteBuffer[i * 4], G = paletteBuffer[i * 4 + 1], B = paletteBuffer[i * 4 + 2], A = paletteBuffer[i * 4 + 3] };
+                    mapTile.palette[i] = new Color() { R = secPaletteBuffer[i * 4], G = secPaletteBuffer[i * 4 + 1], B = secPaletteBuffer[i * 4 + 2], A = secPaletteBuffer[i * 4 + 3] };
                 cp = bmpTwo.Palette;
                 for (int i = 0; i < 256; i++)
                     cp.Entries[i] = System.Drawing.Color.FromArgb(
@@ -139,6 +139,37 @@ namespace FFVI_tileTool
 
         private void button2_Click(object sender, EventArgs e)
         {
+            //is 1st chunk
+            string path = "";
+            using (OpenFileDialog ofd = new OpenFileDialog() { Filter = "*.PNG|*.PNG", Multiselect = false })
+                if (ofd.ShowDialog() == DialogResult.OK)
+                    path = ofd.FileName;
+                else return;
+
+            Bitmap bmp = new Bitmap(path);
+            if(bmp.PixelFormat != PixelFormat.Format8bppIndexed)
+            {
+                MessageBox.Show("PNG is not 8BPP");
+                return;
+            }
+            if(bmp.Height != 512 || bmp.Width != 512)
+            {
+                MessageBox.Show($"Chunk 1 is always 512x512! You are trying to import {bmp.Width}x{bmp.Height} PNG.");
+                return;
+            }
+            byte[] palBuffer = BuildPalette(bmp);
+            BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, 512, 512), ImageLockMode.ReadOnly, PixelFormat.Format8bppIndexed);
+            byte[] b = new byte[512 * 512 + 1024];
+            Buffer.BlockCopy(palBuffer, 0, b, 0, 1024);
+            Marshal.Copy(bmpData.Scan0, b, 1024, 512 * 512);
+            bmp.UnlockBits(bmpData);
+
+            string filePath = st.Where(x => Path.GetFileName(x) == (string)listBox1.SelectedValue).First();
+            byte[] bb = File.ReadAllBytes(filePath);
+            Buffer.BlockCopy(b, 0, bb, 0, b.Length);
+            File.WriteAllBytes(filePath, bb);
+            RenderImage(filePath);
+
             //is first import button; img needs to be 512x512
             //WIP - import the image via bitlock, copy buffer, check if 512x512 and parse palette- therefore check if 8bpp
             //then just put to st[] array (filelist) and copy to buffer on overwrite
@@ -146,7 +177,65 @@ namespace FFVI_tileTool
 
         private void button3_Click(object sender, EventArgs e)
         {
-            //see button2_Click
+            //2nd chunk
+            string path = "";
+            using (OpenFileDialog ofd = new OpenFileDialog() { Filter = "*.PNG|*.PNG", Multiselect = false })
+                if (ofd.ShowDialog() == DialogResult.OK)
+                    path = ofd.FileName;
+                else return;
+
+            Bitmap bmp = new Bitmap(path);
+            if (bmp.PixelFormat != PixelFormat.Format8bppIndexed)
+            {
+                MessageBox.Show("PNG is not 8BPP");
+                return;
+            }
+            if (bmp.Width != 512)
+            {
+                MessageBox.Show($"Chunk 2 is always 512x width! You are trying to import {bmp.Width}x{bmp.Height} PNG.");
+                return;
+            }
+            byte[] palBuffer = BuildPalette(bmp);
+            BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, 512, bmp.Height), ImageLockMode.ReadOnly, PixelFormat.Format8bppIndexed);
+            byte[] b = new byte[512 * bmp.Height + 4096];
+            Buffer.BlockCopy(palBuffer, 0, b, 0, 1024);
+            Buffer.BlockCopy(palBuffer, 0, b, 1024, 1024);
+            Buffer.BlockCopy(palBuffer, 0, b, 2048, 1024);
+            Buffer.BlockCopy(palBuffer, 0, b, 3072, 1024);
+            Marshal.Copy(bmpData.Scan0, b, 4096, 512 * bmp.Height);
+            bmp.UnlockBits(bmpData);
+
+            string filePath = st.Where(x => Path.GetFileName(x) == (string)listBox1.SelectedValue).First();
+            byte[] bb = File.ReadAllBytes(filePath);
+            if(bb.Length < 512*512+1024+b.Length)
+            {
+                MessageBox.Show("Second chunk is too big!");
+                return;
+            }
+            Buffer.BlockCopy(b, 0, bb, 512*512+1024, b.Length);
+            File.WriteAllBytes(filePath, bb);
+            RenderImage(filePath);
+        }
+
+        private byte[] PaletteToByte(System.Drawing.Color[] pal)
+        {
+            throw new Exception("NO");
+            byte[] b = new byte[1024];
+            
+            return b;
+        }
+
+        private static byte[] BuildPalette(Bitmap bmp)
+        {
+            byte[] palBuffer = new byte[1024];
+            for (int i = 0; i < 256; i++)
+            {
+                palBuffer[i * 4 + 0] = bmp.Palette.Entries[i].B;
+                palBuffer[i * 4 + 1] = bmp.Palette.Entries[i].G;
+                palBuffer[i * 4 + 2] = bmp.Palette.Entries[i].R;
+                palBuffer[i * 4 + 3] = (byte)(255 - bmp.Palette.Entries[i].A);
+            }
+            return palBuffer;
         }
     }
 }
